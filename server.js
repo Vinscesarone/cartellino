@@ -46,32 +46,18 @@ function salvaDatiSuJSON() {
 }
 
 client.on('messageCreate', async (message) => {
-    if (message.channel.name === 'cartellino' && !message.author.bot) {
-        const fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
-        fetchedMessages.forEach(msg => {
-            if (msg.author.bot && msg.components.length === 0) {
-                msg.delete().catch(err => console.error(`Errore eliminando messaggio: ${err}`));
-            }
-        });
+    // Ignora i messaggi dai bot
+    if (message.author.bot) return;
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('entra_servizio')
-                .setLabel('Entra in Servizio')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setCustomId('esci_servizio')
-                .setLabel('Esci dal Servizio')
-                .setStyle(ButtonStyle.Danger)
-        );
+    // Comandi del bot
+    const prefix = '!'; // Definisci il prefisso per i comandi
+    if (!message.content.startsWith(prefix)) return;
 
-        const botMessages = fetchedMessages.filter(msg => msg.author.bot && msg.components.length > 0);
-        if (botMessages.size === 0) {
-            await message.channel.send({ content: 'Scegli un\'azione:', components: [row] });
-        }
-    }
+    // Ottieni il comando rimuovendo il prefisso
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
 
-    if (message.content === '!leggiDati') { // Comando per leggere il file
+    if (command === 'leggidati') {
         fs.readFile('utentiInServizio.json', 'utf8', (err, data) => {
             if (err) {
                 message.channel.send('Errore leggendo il file JSON. Assicurati che esista.');
@@ -88,7 +74,7 @@ client.on('messageCreate', async (message) => {
         });
     }
 
-    if (message.content === '!inservizio') { // Comando per elencare gli utenti in servizio
+    if (command === 'inservizio') {
         if (utentiInServizio.size === 0) {
             message.channel.send('Nessun utente è attualmente in servizio.');
         } else {
