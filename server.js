@@ -80,7 +80,6 @@ client.on('interactionCreate', async (interaction) => {
     const member = interaction.guild.members.cache.get(interaction.user.id);
     const nickname = member ? member.displayName : interaction.user.username;
     const userId = interaction.user.id;
-    const timestamp = moment().format('HH:mm:ss');
 
     if (interaction.customId === 'entra_servizio') {
         console.log('Pulsante Entra in Servizio cliccato.'); // Debug
@@ -89,6 +88,7 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: 'Sei già in servizio!', ephemeral: true });
         } else {
             const timestampInizio = Date.now(); // Salviamo un timestamp numerico
+            console.log(`Timestamp salvato: ${timestampInizio}`); // Debug
             utentiInServizio.set(userId, timestampInizio);
 
             salvaDatiSuJSON();
@@ -115,6 +115,7 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: 'Non hai aperto un turno di servizio.', ephemeral: true });
         } else {
             const timestampInizio = utentiInServizio.get(userId); // Recupera il timestamp numerico
+            console.log(`Timestamp recuperato: ${timestampInizio}`); // Debug
             utentiInServizio.delete(userId);
 
             salvaDatiSuJSON();
@@ -123,7 +124,8 @@ client.on('interactionCreate', async (interaction) => {
 
             const serviceChannel = interaction.guild.channels.cache.find(channel => channel.name === 'utenti-in-servizio');
             if (serviceChannel) {
-                const durataServizio = moment.duration(moment().diff(moment(timestampInizio))).humanize();
+                const durataServizio = moment.duration(Date.now() - timestampInizio).humanize();
+                console.log(`Durata calcolata: ${durataServizio}`); // Debug
 
                 const embed = new EmbedBuilder()
                     .setColor('#FF0000')
