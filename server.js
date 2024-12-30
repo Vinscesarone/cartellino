@@ -67,31 +67,6 @@ client.on('messageCreate', async (message) => {
     const args = message.content.slice(prefix.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    if (command === 'leggidati') {
-        fs.readFile('storicoUtenti.json', 'utf8', (err, data) => {
-            if (err) {
-                message.channel.send('Errore leggendo il file JSON. Assicurati che esista.');
-                console.error('Errore leggendo il file JSON:', err);
-            } else {
-                try {
-                    const contenuto = JSON.parse(data);
-                    const datiFormattati = contenuto.map(item => ({
-                        userId: item.userId,
-                        nickname: item.nickname,
-                        entrata: item.entrata,
-                        uscita: item.uscita,
-                        durata: item.durata
-                    }));
-                    message.channel.send('Storico degli utenti:
-' + '```json\n' + JSON.stringify(datiFormattati, null, 2) + '\n```');
-                } catch (parseErr) {
-                    message.channel.send('Errore analizzando il file JSON.');
-                    console.error('Errore analizzando il file JSON:', parseErr);
-                }
-            }
-        });
-    }
-
     if (command === 'inservizio') {
         if (utentiInServizio.size === 0) {
             message.channel.send('Nessun utente è attualmente in servizio.');
@@ -194,4 +169,29 @@ client.on('interactionCreate', async (interaction) => {
                     if (err) {
                         console.error('Errore aggiornando lo storico:', err);
                     } else {
-                        console.log('
+                        console.log('Storico aggiornato correttamente.');
+                    }
+                });
+            });
+
+            salvaDatiSuJSON();
+
+            await interaction.reply({ content: 'Sei ora fuori servizio!', ephemeral: true });
+
+            const serviceChannel = interaction.guild.channels.cache.find(channel => channel.name === 'utenti-in-servizio');
+            if (serviceChannel) {
+                const embed = new EmbedBuilder()
+                    .setColor('#FF0000')
+                    .setTitle(`${nickname}`)
+                    .setDescription(`è uscito dal servizio\n\n**Entrata:** ${moment(timestampInizio).format('HH:mm:ss')}\n**Uscita:** ${moment(timestampUscita).format('HH:mm:ss')}\n**Durata:** ${durataServizio}`)
+                    .setFooter({ text: 'Ospedale Umberto Primo' });
+
+                serviceChannel.send({ embeds: [embed] }).catch(err => console.error(`Errore inviando il messaggio: ${err}`));
+            } else {
+                console.error('Canale utenti-in-servizio non trovato.'); // Debug
+            }
+        }
+    }
+});
+
+client.login(token);
