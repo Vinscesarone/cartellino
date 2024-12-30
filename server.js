@@ -25,16 +25,25 @@ const client = new Client({
 
 const token = process.env.DISCORD_TOKEN;
 const utentiInServizio = new Map();
-let utentiTempo = {};
-
-// Carica i dati salvati (persistenza)
-if (fs.existsSync('utentiTempo.json')) {
-    utentiTempo = JSON.parse(fs.readFileSync('utentiTempo.json', 'utf8'));
-}
 
 client.once('ready', () => {
     console.log(`Bot ${client.user.tag} è online!`);
 });
+
+function salvaDatiSuJSON() {
+    const datiUtenti = Array.from(utentiInServizio.entries()).map(([userId, orario]) => ({
+        userId,
+        orario
+    }));
+
+    fs.writeFile('utentiInServizio.json', JSON.stringify(datiUtenti, null, 2), (err) => {
+        if (err) {
+            console.error('Errore salvando i dati nel file JSON:', err);
+        } else {
+            console.log('Dati salvati correttamente nel file JSON.');
+        }
+    });
+}
 
 client.on('messageCreate', async (message) => {
     if (message.channel.name === 'cartellino' && !message.author.bot) {
@@ -69,45 +78,53 @@ client.on('interactionCreate', async (interaction) => {
     const member = interaction.guild.members.cache.get(interaction.user.id);
     const nickname = member ? member.displayName : interaction.user.username;
     const userId = interaction.user.id;
-    const now = moment();
+    const timestamp = moment().format('HH:mm:ss');
 
     if (interaction.customId === 'entra_servizio') {
         if (utentiInServizio.has(userId)) {
             await interaction.reply({ content: 'Sei già in servizio!', ephemeral: true });
         } else {
-            utentiInServizio.set(userId, now);
-            if (!utentiTempo[userId]) {
-                utentiTempo[userId] = { nickname, totalTime: 0 }; // Inizializza il tempo totale
-            }
+            utentiInServizio.set(userId, timestamp);
+
+            // Salviamo l'utente e il timestamp nel file JSON
+            salvaDatiSuJSON();
+
             await interaction.reply({ content: 'Sei ora in servizio!', ephemeral: true });
+
+            const serviceChannel = interaction.guild.channels.cache.find(channel => channel.name === 'utenti-in-servizio');
+            if (serviceChannel) {
+                const embed = new EmbedBuilder()
+                    .setColor('#008000')
+                    .setTitle(`${nickname}`)
+                    .setDescription(`è entrato in servizio\n\n**Data:** ${timestamp}`)
+                    .setFooter({ text: 'Ospedale Umberto Primo' });
+
+                serviceChannel.send({ embeds: [embed] }).catch(err => console.error(`Errore inviando il messaggio: ${err}`));
+            }
         }
     } else if (interaction.customId === 'esci_servizio') {
         if (!utentiInServizio.has(userId)) {
             await interaction.reply({ content: 'Non hai aperto un turno di servizio.', ephemeral: true });
         } else {
-            const startTime = utentiInServizio.get(userId);
-            const elapsedTime = now.diff(startTime, 'seconds'); // Tempo in secondi
+            const tempoInizio = utentiInServizio.get(userId);
             utentiInServizio.delete(userId);
 
-            // Aggiungi il tempo trascorso al totale
-            utentiTempo[userId].totalTime += elapsedTime;
+            // Salviamo l'utente e il timestamp aggiornato nel file JSON
+            salvaDatiSuJSON();
 
-            // Salva i dati su file
-            fs.writeFileSync('utentiTempo.json', JSON.stringify(utentiTempo, null, 2));
-
-            await interaction.reply({ content: `Sei ora fuori servizio! Tempo totale accumulato: ${Math.floor(utentiTempo[userId].totalTime / 60)} minuti.`, ephemeral: true });
+            await interaction.reply({ content: 'Sei ora fuori servizio!', ephemeral: true });
 
             const serviceChannel = interaction.guild.channels.cache.find(channel => channel.name === 'utenti-in-servizio');
             if (serviceChannel) {
+                const durataServizio = moment.duration(moment().diff(moment(tempoInizio))).humanize();
+
                 const embed = new EmbedBuilder()
                     .setColor('#FF0000')
-                    .setTitle(`${nickname}`) // Nome o nickname dell'utente
-                    .setDescription(`è uscito dal servizio
-
-**Tempo totale accumulato:** ${Math.floor(utentiTempo[userId].totalTime / 60)} minuti`)
+                    .setTitle(`${nickname}`)
+                    .setDescription(`è uscito dal servizio\n\n**Data:** ${timestamp}\n**Durata servizio:** ${durataServizio}`)
                     .setFooter({ text: 'Ospedale Umberto Primo' });
 
-                serviceChannel.send({ embeds: [embed] });
+                serviceChannel.send({ embeds: [embed] }).catch(err => console.error(`Errore inviando il messaggio: ${err}`));
             }
         }
     }
