@@ -87,7 +87,7 @@ client.on('interactionCreate', async (interaction) => {
                 // Crea un embed per l'uscita
                 const embed = new EmbedBuilder()
                     .setColor('#FF0000') // Colore rosso
-                    .setTitle(${nickname}) // Solo il nome/nickname nella prima riga
+                   .setTitle(${nickname}) // Solo il nome/nickname nella prima riga
                     .setDescription(è uscito dal  servizio\n\n**Data:** ${timestamp})
                     .setFooter({ text: 'Ospedale Umberto Primo' });
 
