@@ -88,8 +88,8 @@ client.on('interactionCreate', async (interaction) => {
         if (utentiInServizio.has(userId)) {
             await interaction.reply({ content: 'Sei già in servizio!', ephemeral: true });
         } else {
-            console.log(`Aggiungendo ${nickname} (${userId}) alla lista utenti in servizio.`); // Debug
-            utentiInServizio.set(userId, timestamp);
+            const timestampInizio = Date.now(); // Salviamo un timestamp numerico
+            utentiInServizio.set(userId, timestampInizio);
 
             salvaDatiSuJSON();
 
@@ -100,7 +100,7 @@ client.on('interactionCreate', async (interaction) => {
                 const embed = new EmbedBuilder()
                     .setColor('#008000')
                     .setTitle(`${nickname}`)
-                    .setDescription(`è entrato in servizio\n\n**Data:** ${timestamp}`)
+                    .setDescription(`è entrato in servizio\n\n**Data:** ${moment(timestampInizio).format('HH:mm:ss')}`)
                     .setFooter({ text: 'Ospedale Umberto Primo' });
 
                 serviceChannel.send({ embeds: [embed] }).catch(err => console.error(`Errore inviando il messaggio: ${err}`));
@@ -114,7 +114,7 @@ client.on('interactionCreate', async (interaction) => {
         if (!utentiInServizio.has(userId)) {
             await interaction.reply({ content: 'Non hai aperto un turno di servizio.', ephemeral: true });
         } else {
-            const tempoInizio = utentiInServizio.get(userId);
+            const timestampInizio = utentiInServizio.get(userId); // Recupera il timestamp numerico
             utentiInServizio.delete(userId);
 
             salvaDatiSuJSON();
@@ -123,12 +123,12 @@ client.on('interactionCreate', async (interaction) => {
 
             const serviceChannel = interaction.guild.channels.cache.find(channel => channel.name === 'utenti-in-servizio');
             if (serviceChannel) {
-                const durataServizio = moment.duration(moment().diff(moment(tempoInizio))).humanize();
+                const durataServizio = moment.duration(moment().diff(moment(timestampInizio))).humanize();
 
                 const embed = new EmbedBuilder()
                     .setColor('#FF0000')
                     .setTitle(`${nickname}`)
-                    .setDescription(`è uscito dal servizio\n\n**Data:** ${timestamp}\n**Durata servizio:** ${durataServizio}`)
+                    .setDescription(`è uscito dal servizio\n\n**Data:** ${moment().format('HH:mm:ss')}\n**Durata servizio:** ${durataServizio}`)
                     .setFooter({ text: 'Ospedale Umberto Primo' });
 
                 serviceChannel.send({ embeds: [embed] }).catch(err => console.error(`Errore inviando il messaggio: ${err}`));
