@@ -70,6 +70,36 @@ client.on('messageCreate', async (message) => {
             await message.channel.send({ content: 'Scegli un\'azione:', components: [row] });
         }
     }
+
+    if (message.content === '!leggiDati') { // Comando per leggere il file
+        fs.readFile('utentiInServizio.json', 'utf8', (err, data) => {
+            if (err) {
+                message.channel.send('Errore leggendo il file JSON. Assicurati che esista.');
+                console.error('Errore leggendo il file JSON:', err);
+            } else {
+                try {
+                    const contenuto = JSON.parse(data);
+                    message.channel.send('Contenuto del file JSON:\n' + '```json\n' + JSON.stringify(contenuto, null, 2) + '\n```');
+                } catch (parseErr) {
+                    message.channel.send('Errore analizzando il file JSON.');
+                    console.error('Errore analizzando il file JSON:', parseErr);
+                }
+            }
+        });
+    }
+
+    if (message.content === '!inservizio') { // Comando per elencare gli utenti in servizio
+        if (utentiInServizio.size === 0) {
+            message.channel.send('Nessun utente è attualmente in servizio.');
+        } else {
+            const utenti = Array.from(utentiInServizio.entries()).map(([userId, orario]) => {
+                const user = message.guild.members.cache.get(userId);
+                const nickname = user ? user.displayName : userId;
+                return `- ${nickname} (Entrato: ${moment(orario).format('HH:mm:ss')})`;
+            });
+            message.channel.send('Utenti attualmente in servizio:\n' + utenti.join('\n'));
+        }
+    }
 });
 
 client.on('interactionCreate', async (interaction) => {
