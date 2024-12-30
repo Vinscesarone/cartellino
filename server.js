@@ -30,29 +30,23 @@ client.once('ready', () => {
     console.log(`Bot ${client.user.tag} è online!`);
 });
 
-function salvaDatiSuJSON() {
-    const datiUtenti = Array.from(utentiInServizio.entries()).map(([userId, orario]) => ({
-        userId,
-        entrata: moment(orario).format('YYYY-MM-DD HH:mm:ss'),
-        uscita: null,
-        durata: null
-    }));
+function leggiStorico() {
+    try {
+        const data = fs.readFileSync('storicoUtenti.json', 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        console.error('Errore leggendo o analizzando lo storico:', err);
+        return [];
+    }
+}
 
-    fs.readFile('storicoUtenti.json', 'utf8', (err, data) => {
-        let datiEsistenti = [];
-        if (!err && data) {
-            datiEsistenti = JSON.parse(data); // Carica lo storico esistente
-        }
-        const nuovoStorico = [...datiEsistenti, ...datiUtenti];
-
-        fs.writeFile('storicoUtenti.json', JSON.stringify(nuovoStorico, null, 2), (err) => {
-            if (err) {
-                console.error('Errore salvando lo storico:', err);
-            } else {
-                console.log('Storico aggiornato correttamente.');
-            }
-        });
-    });
+function scriviStorico(storico) {
+    try {
+        fs.writeFileSync('storicoUtenti.json', JSON.stringify(storico, null, 2), 'utf8');
+        console.log('Storico aggiornato correttamente.');
+    } catch (err) {
+        console.error('Errore salvando lo storico:', err);
+    }
 }
 
 client.on('messageCreate', async (message) => {
@@ -81,26 +75,20 @@ client.on('messageCreate', async (message) => {
     }
 
     if (command === 'storico') {
-        fs.readFile('storicoUtenti.json', 'utf8', (err, data) => {
-            if (err) {
-                message.channel.send('Errore leggendo lo storico. Assicurati che esista.');
-                console.error('Errore leggendo lo storico:', err);
-            } else {
-                try {
-                    const storico = JSON.parse(data);
-                    const formattato = storico.map(entry => 
-                        `**${entry.nickname || entry.userId}**\n` +
-                        `- Entrata: ${entry.entrata}\n` +
-                        `- Uscita: ${entry.uscita || 'Ancora in servizio'}\n` +
-                        `- Durata: ${entry.durata || 'N/A'}`
-                    ).join('\n\n');
-                    message.channel.send('Storico completo degli utenti:\n\n' + formattato);
-                } catch (parseErr) {
-                    message.channel.send('Errore analizzando lo storico.');
-                    console.error('Errore analizzando lo storico:', parseErr);
-                }
-            }
-        });
+        const storico = leggiStorico();
+        if (storico.length === 0) {
+            message.channel.send('Nessun dato disponibile nello storico.');
+            return;
+        }
+
+        const formattato = storico.map(entry => 
+            `**${entry.nickname || entry.userId}**\n` +
+            `- Entrata: ${entry.entrata}\n` +
+            `- Uscita: ${entry.uscita || 'Ancora in servizio'}\n` +
+            `- Durata: ${entry.durata || 'N/A'}`
+        ).join('\n\n');
+
+        message.channel.send('Storico completo degli utenti:\n\n' + formattato);
     }
 });
 
@@ -123,7 +111,15 @@ client.on('interactionCreate', async (interaction) => {
             console.log(`Timestamp salvato: ${timestampInizio}`); // Debug
             utentiInServizio.set(userId, timestampInizio);
 
-            salvaDatiSuJSON();
+            const storico = leggiStorico();
+            storico.push({
+                userId,
+                nickname,
+                entrata: moment(timestampInizio).format('YYYY-MM-DD HH:mm:ss'),
+                uscita: null,
+                durata: null
+            });
+            scriviStorico(storico);
 
             await interaction.reply({ content: 'Sei ora in servizio!', ephemeral: true });
 
@@ -151,12 +147,12 @@ client.on('interactionCreate', async (interaction) => {
             const durataServizio = moment.duration(timestampUscita - timestampInizio).humanize();
             utentiInServizio.delete(userId);
 
-            fs.readFile('storicoUtenti.json', 'utf8', (err, data) => {
-                let storico = [];
-                if (!err && data) {
-                    storico = JSON.parse(data);
-                }
-
+            const storico = leggiStorico();
+            const indice = storico.findIndex(entry => entry.userId === userId && !entry.uscita);
+            if (indice !== -1) {
+                storico[indice].uscita = moment(timestampUscita).format('YYYY-MM-DD HH:mm:ss');
+                storico[indice].durata = durataServizio;
+            } else {
                 storico.push({
                     userId,
                     nickname,
@@ -164,17 +160,8 @@ client.on('interactionCreate', async (interaction) => {
                     uscita: moment(timestampUscita).format('YYYY-MM-DD HH:mm:ss'),
                     durata: durataServizio
                 });
-
-                fs.writeFile('storicoUtenti.json', JSON.stringify(storico, null, 2), (err) => {
-                    if (err) {
-                        console.error('Errore aggiornando lo storico:', err);
-                    } else {
-                        console.log('Storico aggiornato correttamente.');
-                    }
-                });
-            });
-
-            salvaDatiSuJSON();
+            }
+            scriviStorico(storico);
 
             await interaction.reply({ content: 'Sei ora fuori servizio!', ephemeral: true });
 
