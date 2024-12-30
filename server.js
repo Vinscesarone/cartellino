@@ -33,15 +33,25 @@ client.once('ready', () => {
 function salvaDatiSuJSON() {
     const datiUtenti = Array.from(utentiInServizio.entries()).map(([userId, orario]) => ({
         userId,
-        orario
+        entrata: moment(orario).format('YYYY-MM-DD HH:mm:ss'),
+        uscita: null,
+        durata: null
     }));
 
-    fs.writeFile('utentiInServizio.json', JSON.stringify(datiUtenti, null, 2), (err) => {
-        if (err) {
-            console.error('Errore salvando i dati nel file JSON:', err);
-        } else {
-            console.log('Dati salvati correttamente nel file JSON.');
+    fs.readFile('storicoUtenti.json', 'utf8', (err, data) => {
+        let datiEsistenti = [];
+        if (!err && data) {
+            datiEsistenti = JSON.parse(data); // Carica lo storico esistente
         }
+        const nuovoStorico = [...datiEsistenti, ...datiUtenti];
+
+        fs.writeFile('storicoUtenti.json', JSON.stringify(nuovoStorico, null, 2), (err) => {
+            if (err) {
+                console.error('Errore salvando lo storico:', err);
+            } else {
+                console.log('Storico aggiornato correttamente.');
+            }
+        });
     });
 }
 
@@ -58,14 +68,22 @@ client.on('messageCreate', async (message) => {
     const command = args.shift().toLowerCase();
 
     if (command === 'leggidati') {
-        fs.readFile('utentiInServizio.json', 'utf8', (err, data) => {
+        fs.readFile('storicoUtenti.json', 'utf8', (err, data) => {
             if (err) {
                 message.channel.send('Errore leggendo il file JSON. Assicurati che esista.');
                 console.error('Errore leggendo il file JSON:', err);
             } else {
                 try {
                     const contenuto = JSON.parse(data);
-                    message.channel.send('Contenuto del file JSON:\n' + '```json\n' + JSON.stringify(contenuto, null, 2) + '\n```');
+                    const datiFormattati = contenuto.map(item => ({
+                        userId: item.userId,
+                        nickname: item.nickname,
+                        entrata: item.entrata,
+                        uscita: item.uscita,
+                        durata: item.durata
+                    }));
+                    message.channel.send('Storico degli utenti:
+' + '```json\n' + JSON.stringify(datiFormattati, null, 2) + '\n```');
                 } catch (parseErr) {
                     message.channel.send('Errore analizzando il file JSON.');
                     console.error('Errore analizzando il file JSON:', parseErr);
@@ -85,6 +103,29 @@ client.on('messageCreate', async (message) => {
             });
             message.channel.send('Utenti attualmente in servizio:\n' + utenti.join('\n'));
         }
+    }
+
+    if (command === 'storico') {
+        fs.readFile('storicoUtenti.json', 'utf8', (err, data) => {
+            if (err) {
+                message.channel.send('Errore leggendo lo storico. Assicurati che esista.');
+                console.error('Errore leggendo lo storico:', err);
+            } else {
+                try {
+                    const storico = JSON.parse(data);
+                    const formattato = storico.map(entry => 
+                        `**${entry.nickname || entry.userId}**\n` +
+                        `- Entrata: ${entry.entrata}\n` +
+                        `- Uscita: ${entry.uscita || 'Ancora in servizio'}\n` +
+                        `- Durata: ${entry.durata || 'N/A'}`
+                    ).join('\n\n');
+                    message.channel.send('Storico completo degli utenti:\n\n' + formattato);
+                } catch (parseErr) {
+                    message.channel.send('Errore analizzando lo storico.');
+                    console.error('Errore analizzando lo storico:', parseErr);
+                }
+            }
+        });
     }
 });
 
@@ -131,30 +172,26 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: 'Non hai aperto un turno di servizio.', ephemeral: true });
         } else {
             const timestampInizio = utentiInServizio.get(userId); // Recupera il timestamp numerico
-            console.log(`Timestamp recuperato: ${timestampInizio}`); // Debug
+            const timestampUscita = Date.now();
+            const durataServizio = moment.duration(timestampUscita - timestampInizio).humanize();
             utentiInServizio.delete(userId);
 
-            salvaDatiSuJSON();
+            fs.readFile('storicoUtenti.json', 'utf8', (err, data) => {
+                let storico = [];
+                if (!err && data) {
+                    storico = JSON.parse(data);
+                }
 
-            await interaction.reply({ content: 'Sei ora fuori servizio!', ephemeral: true });
+                storico.push({
+                    userId,
+                    nickname,
+                    entrata: moment(timestampInizio).format('YYYY-MM-DD HH:mm:ss'),
+                    uscita: moment(timestampUscita).format('YYYY-MM-DD HH:mm:ss'),
+                    durata: durataServizio
+                });
 
-            const serviceChannel = interaction.guild.channels.cache.find(channel => channel.name === 'utenti-in-servizio');
-            if (serviceChannel) {
-                const durataServizio = moment.duration(Date.now() - timestampInizio).humanize();
-                console.log(`Durata calcolata: ${durataServizio}`); // Debug
-
-                const embed = new EmbedBuilder()
-                    .setColor('#FF0000')
-                    .setTitle(`${nickname}`)
-                    .setDescription(`è uscito dal servizio\n\n**Data:** ${moment().format('HH:mm:ss')}\n**Durata servizio:** ${durataServizio}`)
-                    .setFooter({ text: 'Ospedale Umberto Primo' });
-
-                serviceChannel.send({ embeds: [embed] }).catch(err => console.error(`Errore inviando il messaggio: ${err}`));
-            } else {
-                console.error('Canale utenti-in-servizio non trovato.'); // Debug
-            }
-        }
-    }
-});
-
-client.login(token);
+                fs.writeFile('storicoUtenti.json', JSON.stringify(storico, null, 2), (err) => {
+                    if (err) {
+                        console.error('Errore aggiornando lo storico:', err);
+                    } else {
+                        console.log('
