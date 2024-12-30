@@ -68,7 +68,7 @@ client.on('interactionCreate', async (interaction) => {
                 // Crea un embed per l'ingresso
                 const embed = new EmbedBuilder()
                     .setColor('#008000') // Colore verde
-                    .setTitle(${nickname}) // Solo il nome/nickname nella prima riga
+                    .setTitle(`${nickname}`) // Solo il nome/nickname nella prima riga
                     .setDescription(è entrato in servizio\n\n**Data:** ${timestamp})
                     .setFooter({ text: 'Ospedale Umberto Primo' });
 
