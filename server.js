@@ -15,7 +15,7 @@ const token = 'MTMyMDY5MTE4NzE4Njc5ODYwMg.GdjM_h.0kIvMVkC72b_v6IciYklEaajq4os2li
 const utentiInServizio = new Map(); // Per tracciare gli utenti in servizio
 
 client.once('ready', () => {
-    console.log(Bot ${client.user.tag} è online!);
+    console.log(`Bot ${client.user.tag} è online!`);
 });
 
 client.on('messageCreate', async (message) => {
