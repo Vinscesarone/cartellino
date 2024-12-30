@@ -24,7 +24,7 @@ client.on('messageCreate', async (message) => {
         const fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
         fetchedMessages.forEach(msg => {
             if (msg.author.bot && msg.components.length === 0) {
-                msg.delete().catch(err => console.error(`Errore eliminando messaggio: ${err}`));
+               msg.delete().catch(err => console.error(`Errore eliminando messaggio: ${err}`));
             }
         });
 
